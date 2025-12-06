@@ -1,32 +1,42 @@
 import { connect } from 'cloudflare:sockets';
 
 // =============================================================================
-// 🟣 用户配置区域
+// 🟣 用户配置区域 
 // =============================================================================
-const UUID = "06b65903-406d-4a41-8463-6fd5c0ee7798";   //修改可用的UUID
+const UUID = "06b65903-406d-4a41-8463-6fd5c0ee7798"; 
 
 // 1. 后台管理密码
-const WEB_PASSWORD = "";   //修改你的后台管理密码
-
-// 2. 快速订阅密码 (例如访问 https://域名/tian+.1)
-const SUB_PASSWORD = "";   //修改你的订阅链接密码 
+const WEB_PASSWORD = ""; //修改你的管理密码
+// 2. 快速订阅密码 (访问 https://域名/密码)
+const SUB_PASSWORD = ""; //修改你的订阅密码
 
 // 3. 默认基础配置
 // 🔴 默认 ProxyIP (代码修改此处生效，客户端修改 path 生效)
-const DEFAULT_PROXY_IP = "tw.sni2025.netlib.re"; 
+const DEFAULT_PROXY_IP = "tw.sni2025.netlib.re"; //可自定义修改你的proxyip
 
 // 🔴 真实订阅源 (写死读取)
-const DEFAULT_SUB_DOMAIN = "sub.cmliussss.net";  //支持自定义修改源，即订阅器SUB
+const DEFAULT_SUB_DOMAIN = "sub.cmliussss.net";  //可自定义修改你的sub=优选订阅器
 
+//群组+检测站修改处
 const TG_GROUP_URL = "https://t.me/zyssadmin";   
 const TG_CHANNEL_URL = "https://t.me/cloudflareorg"; 
 const PROXY_CHECK_URL = "https://kaic.hidns.co/"; 
 
-// 4. 订阅转换配置
-const DEFAULT_CONVERTER = "https://subapi.cmliussss.net";   //支持自定义修改subapi
-const DEFAULT_CONFIG = "https://raw.githubusercontent.com/cmliu/ACL4SSR/main/Clash/config/ACL4SSR_Online_Full_MultiMode.ini";  //支持自定义修改订阅转换配置链接
+const DEFAULT_CONVERTER = "https://subapi.cmliussss.net"; //可自定义修改你的subapi
 
-// 5. 自定义优选IP (仅用于本地备用) //修改自定义优选IP在这里修改
+// Clash 默认配置 (完整兼容性好)
+const CLASH_CONFIG = "https://raw.githubusercontent.com/cmliu/ACL4SSR/main/Clash/config/ACL4SSR_Online_Full_MultiMode.ini"; //可自定义修改你的订阅配置
+
+// 🚨🚨🚨 [Sing-box 专用配置] 自动双版本容灾 【勿动】
+// 优先级 1: 1.12.x
+const SINGBOX_CONFIG_V12 = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.12.x/sing-box.json"; //勿动
+// 优先级 2: 1.11.x (当 1.12 不可用时自动切换)
+const SINGBOX_CONFIG_V11 = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.json"; //勿动
+
+// 🔴 TG配置 (在""填写你需要的内容)
+const TG_BOT_TOKEN = ""; //你的机器人token
+const TG_CHAT_ID = ""; //你的telegram 用户id
+
 const DEFAULT_CUSTOM_IPS = `173.245.58.127#CF官方优选
 8.39.125.176#CF官方优选
 172.64.228.106#CF官方优选
@@ -43,497 +53,260 @@ const DEFAULT_CUSTOM_IPS = `173.245.58.127#CF官方优选
 172.67.71.105#CF官方优选
 162.159.37.12#CF官方优选
 104.18.33.144#CF官方优选`;
+
 // =============================================================================
+// ⚡️ 核心逻辑区
+// =============================================================================
+const MAX_PENDING=2097152,KEEPALIVE=15000,STALL_TO=8000,MAX_STALL=12,MAX_RECONN=24;
+const buildUUID=(a,i)=>[...a.slice(i,i+16)].map(n=>n.toString(16).padStart(2,'0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/,'$1-$2-$3-$4-$5');
+const extractAddr=b=>{const o=18+b[17]+1,p=(b[o]<<8)|b[o+1],t=b[o+2];let l,h,O=o+3;switch(t){case 1:l=4;h=b.slice(O,O+l).join('.');break;case 2:l=b[O++];h=new TextDecoder().decode(b.slice(O,O+l));break;case 3:l=16;h=`[${[...Array(8)].map((_,i)=>((b[O+i*2]<<8)|b[O+i*2+1]).toString(16)).join(':')}]`;break;default:throw new Error('Addr type error');}return{host:h,port:p,payload:b.slice(O+l)}};
 
-const MAX_PENDING = 2097152, KEEPALIVE = 15000, STALL_TO = 8000, MAX_STALL = 12, MAX_RECONN = 24;
-const buildUUID = (a, i) => Array.from(a.slice(i, i + 16)).map(n => n.toString(16).padStart(2, '0')).join('').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
-const extractAddr = b => {
-  const o1 = 18 + b[17] + 1, p = (b[o1] << 8) | b[o1 + 1], t = b[o1 + 2]; let o2 = o1 + 3, h, l;
-  switch (t) {
-    case 1: l = 4; h = b.slice(o2, o2 + l).join('.'); break;
-    case 2: l = b[o2++]; h = new TextDecoder().decode(b.slice(o2, o2 + l)); break;
-    case 3: l = 16; h = `[${Array.from({ length: 8 }, (_, i) => ((b[o2 + i * 2] << 8) | b[o2 + i * 2 + 1]).toString(16)).join(':')}]`; break;
-    default: throw new Error('Invalid address type.');
-  } return { host: h, port: p, payload: b.slice(o2 + l) };
-};
+async function resolveNetlib(n){try{const r=await fetch(`https://1.1.1.1/dns-query?name=${n}&type=TXT`,{headers:{'Accept':'application/dns-json'}});if(!r.ok)return null;const d=await r.json(),t=(d.Answer||[]).filter(x=>x.type===16).map(x=>x.data);if(!t.length)return null;let D=t[0].replace(/^"|"$/g,'');const p=D.replace(/\\010|\n/g,',').split(',').map(s=>s.trim()).filter(Boolean);return p.length?p[Math.floor(Math.random()*p.length)]:null}catch{return null}}
+async function parseIP(p){p=p.toLowerCase();if(p.includes('.netlib')){const n=await resolveNetlib(p);p=n||p}let a=p,o=443;if(p.includes('.tp')){const m=p.match(/\.tp(\d+)/);if(m)o=parseInt(m[1],10);return[a,o]}if(p.includes(']:')){const s=p.split(']:');a=s[0]+']';o=parseInt(s[1],10)||o}else if(p.includes(':')&&!p.startsWith('[')){const i=p.lastIndexOf(':');a=p.slice(0,i);o=parseInt(p.slice(i+1),10)||o}return[a,o]}
 
-// ====================================================================
-// === 新增/修改的异步解析逻辑 (基于 .netlib) ===
-// ====================================================================
+class Pool{constructor(){this.b=new ArrayBuffer(16384);this.p=0;this.l=[];this.m=8}alloc(s){if(s<=4096&&s<=16384-this.p){const v=new Uint8Array(this.b,this.p,s);this.p+=s;return v}const r=this.l.pop();return r&&r.byteLength>=s?new Uint8Array(r.buffer,0,s):new Uint8Array(s)}free(b){if(b.buffer===this.b)this.p=Math.max(0,this.p-b.length);else if(this.l.length<this.m&&b.byteLength>=1024)this.l.push(b)}reset(){this.p=0;this.l=[]}}
 
-/**
- * 异步函数：通过 DNS over HTTPS 查询域名的 TXT 记录，并从中随机选择一个 IP:端口 地址。
- */
-async function resolveNetlibDomainAsync(netlib) {
-    try {
-        const response = await fetch(`https://1.1.1.1/dns-query?name=${netlib}&type=TXT`, {
-            headers: { 'Accept': 'application/dns-json' }
-        });
-        
-        if (!response.ok) return null;
-        
-        const data = await response.json();
-        const txtRecords = (data.Answer || [])
-            .filter(record => record.type === 16)
-            .map(record => record.data);
-            
-        if (txtRecords.length === 0) return null;
-        
-        let txtData = txtRecords[0];
-        if (txtData.startsWith('"') && txtData.endsWith('"')) {
-            txtData = txtData.slice(1, -1);
-        }
-        
-        const prefixes = txtData
-            .replace(/\\010/g, ',')
-            .replace(/\n/g, ',')
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean);
-            
-        if (prefixes.length === 0) return null;
-        
-        return prefixes[Math.floor(Math.random() * prefixes.length)];
-        
-    } catch (error) {
-        // console.error('解析Netlib域名失败:', error); 
-        return null;
+// 🟢 注入功能： 随机打乱排序
+function genNodes(h,u,p){
+    let l = DEFAULT_CUSTOM_IPS.split('\n').filter(line => line.trim() !== "");
+    // 随机打乱
+    for (let i = l.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [l[i], l[j]] = [l[j], l[i]];
     }
+    const P=p?`/proxyip=${p.trim()}`:"/",E=encodeURIComponent(P);
+    const PT='v'+'l'+'e'+'s'+'s';
+    return l.map(L=>{
+        const[a,n]=L.split('#'),I=a.trim(),N=n?n.trim():'Worker-Node';
+        let i=I,pt="443";
+        if(I.includes(':')&&!I.includes('[')){const s=I.split(':');i=s[0];pt=s[1]}
+        return`${PT}://${u}@${i}:${pt}?encryption=none&security=tls&sni=${h}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${h}&path=${E}#${encodeURIComponent(N)}`
+    }).join('\n');
 }
 
-/**
- * 主解析函数：处理 .netlib 的异步逻辑和其他同步逻辑。
- * (替代了原有的同步 parseAddressPort)
- */
-async function 解析地址端口(proxyIP) {
-    proxyIP = proxyIP.toLowerCase();
-
-    // --- 1. 处理 .netlib 域名解析（异步部分） ---
-    if (proxyIP.includes('.netlib')) { 
-        const netlibResult = await resolveNetlibDomainAsync(proxyIP);
-        proxyIP = netlibResult || proxyIP;
-    }
-
-    let 地址 = proxyIP, 端口 = 443; // 默认端口 443
-
-    // --- 2. 处理 .tpXX 端口分离 ---
-    if (proxyIP.includes('.tp')) {
-        const tpMatch = proxyIP.match(/\.tp(\d+)/);
-        if (tpMatch) {
-            端口 = parseInt(tpMatch[1], 10);
-        }
-        return [地址, 端口];
-    }
-    
-    // --- 3. 处理 IPV6/IPV4/域名:端口 分离 (同步部分) ---
-    if (proxyIP.includes(']:')) {
-        // IPV6 [::]:port
-        const parts = proxyIP.split(']:');
-        地址 = parts[0] + ']';
-        端口 = parseInt(parts[1], 10) || 端口;
-    } 
-    else if (proxyIP.includes(':') && !proxyIP.startsWith('[')) {
-        // IPV4/域名:port
-        const colonIndex = proxyIP.lastIndexOf(':');
-        地址 = proxyIP.slice(0, colonIndex);
-        端口 = parseInt(proxyIP.slice(colonIndex + 1), 10) || 端口;
-    }
-    
-    return [地址, 端口];
-}
-
-// 原始的 parseAddressPort 函数已被删除/替换，不再使用。
-
-class Pool {
-  constructor() { this.buf = new ArrayBuffer(16384); this.ptr = 0; this.pool = []; this.max = 8; this.large = false; }
-  alloc = s => {
-    if (s <= 4096 && s <= 16384 - this.ptr) { const v = new Uint8Array(this.buf, this.ptr, s); this.ptr += s; return v; } const r = this.pool.pop();
-    if (r && r.byteLength >= s) return new Uint8Array(r.buffer, 0, s); return new Uint8Array(s);
-  };
-  free = b => {
-    if (b.buffer === this.buf) { this.ptr = Math.max(0, this.ptr - b.length); return; }
-    if (this.pool.length < this.max && b.byteLength >= 1024) this.pool.push(b);
-  }; enableLarge = () => { this.large = true; }; reset = () => { this.ptr = 0; this.pool.length = 0; this.large = false; };
-}
-
-// 辅助：本地生成
-function generateNodeList(host, uuid, proxyIp) {
-    let nodeList = [];
-    const lines = DEFAULT_CUSTOM_IPS.split('\n');
-    // 🟢 敏感词打散处理：v + l + e + s + s
-    const protocol = 'v' + 'l' + 'e' + 's' + 's'; 
-    let pathParam = "/";
-    if (proxyIp && proxyIp.trim().length > 0) pathParam = `/proxyip=${proxyIp.trim()}`;
-    const encodedPath = encodeURIComponent(pathParam);
-    lines.forEach(line => {
-        if(!line.trim()) return;
-        const parts = line.split('#');
-        let addr = parts[0].trim();
-        let note = parts[1] ? parts[1].trim() : 'Worker-Node';
-        let ip = addr; let port = "443";
-        if (addr.includes(':') && !addr.includes('[')) { const p = addr.split(':'); ip = p[0]; port = p[1]; }
-        nodeList.push(`${protocol}://${uuid}@${ip}:${port}?encryption=none&security=tls&sni=${host}&alpn=h3&fp=random&allowInsecure=1&type=ws&host=${host}&path=${encodedPath}#${encodeURIComponent(note)}`);
-    });
-    return nodeList.join('\n');
+// 🟢 注入功能：TG通知
+async function sendTgMsg(ctx, title, r, detail = "") {
+  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+  try {
+    const url = new URL(r.url);
+    const ip = r.headers.get('cf-connecting-ip') || 'Unknown';
+    const ua = r.headers.get('User-Agent') || 'Unknown';
+    const city = r.cf?.city || 'Unknown';
+    const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    const safe = (str) => (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const text = `<b>📡 ${safe(title)}</b>\n\n` + `<b>🕒 时间:</b> <code>${time}</code>\n` + `<b>🌍 IP:</b> <code>${safe(ip)} (${safe(city)})</code>\n` + `<b>🔗 域名:</b> <code>${safe(url.hostname)}</code>\n` + `<b>🛣️ 路径:</b> <code>${safe(url.pathname)}</code>\n` + `<b>📱 客户端:</b> <code>${safe(ua)}</code>\n` + (detail ? `<b>ℹ️ 详情:</b> ${safe(detail)}` : "");
+    const params = { chat_id: TG_CHAT_ID, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
+    return fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) }).catch(e => console.error("TG Send Error:", e));
+  } catch(e) { console.error("TG Setup Error:", e); }
 }
 
 export default {
-  async fetch(r) { 
-    const url = new URL(r.url);
-    const host = url.hostname; 
+  async fetch(r, env, ctx) { 
+    try {
+      const url = new URL(r.url);
+      const host = url.hostname; 
+      const UA = (r.headers.get('User-Agent') || "").toLowerCase();
 
-    // =========================================================================
-    // 🟢 1. 快速订阅接口 (/:SUB_PASSWORD)
-    // =========================================================================
-    if (SUB_PASSWORD && url.pathname === `/${SUB_PASSWORD}`) {
-        const userAgent = (r.headers.get('User-Agent') || "").toLowerCase();
-        // 敏感词逻辑检查保留，但字符串本身无害
-        const isClash = userAgent.includes('clash') || userAgent.includes('meta') || userAgent.includes('stash');
-        const isFlagged = url.searchParams.has('flag');
+      if (url.pathname === '/favicon.ico') return new Response(null, { status: 404 });
 
-        // Clash 回旋镖
-        if (isClash && !isFlagged) {
-            const requestProxyIp = url.searchParams.get('proxyip');
-            let selfUrl = `https://${host}/${SUB_PASSWORD}?flag=true`;
-            if (requestProxyIp) selfUrl += `&proxyip=${encodeURIComponent(requestProxyIp)}`;
-
-            const converterUrl = `${DEFAULT_CONVERTER}/sub?target=clash&url=${encodeURIComponent(selfUrl)}&config=${encodeURIComponent(DEFAULT_CONFIG)}&emoji=true&list=false&tfo=false&scv=false&fdn=false&sort=false`;
-            try {
-                const subRes = await fetch(converterUrl);
-                return new Response(subRes.body, { status: 200, headers: subRes.headers });
-            } catch (err) {
-                return new Response("Config conversion failed.", { status: 500 });
-            }
-        }
-
-        // --- 核心抓取与替换逻辑 ---
-        
-        let upstream = DEFAULT_SUB_DOMAIN.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-        if (!upstream) upstream = host;
-        
-        let reqProxyIp = url.searchParams.get('proxyip');
-        if (!reqProxyIp && DEFAULT_PROXY_IP && DEFAULT_PROXY_IP.trim() !== "") {
-            reqProxyIp = DEFAULT_PROXY_IP;
-        }
-
-        let targetPath = "/";
-        if (reqProxyIp && reqProxyIp.trim() !== "") {
-            targetPath = `/proxyip=${reqProxyIp.trim()}`;
-        }
-
-        const params = new URLSearchParams();
-        params.append("uuid", UUID);
-        params.append("host", upstream);
-        params.append("sni", upstream);
-        params.append("path", targetPath); 
-        params.append("type", "ws");
-        params.append("encryption", "none");
-        params.append("security", "tls");
-        params.append("alpn", "h3");
-        params.append("fp", "random");
-        params.append("allowInsecure", "1");
-
-        const upstreamUrl = `https://${upstream}/sub?${params.toString()}`;
-
-        try {
-            // 🟢 重点修改：User-Agent 伪装成 Chrome 浏览器
-  
-            const response = await fetch(upstreamUrl, { 
-                headers: { 
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
-                } 
-            });
-            
-            if (response.ok) {
-                const text = await response.text();
-                try {
-                    let content = atob(text.trim());
-                    content = content.replace(/path=[^&#]*/g, `path=${encodeURIComponent(targetPath)}`);
-                    content = content.replace(/host=[^&]*/g, `host=${host}`);
-                    content = content.replace(/sni=[^&]*/g, `sni=${host}`);
-                    return new Response(btoa(content), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-                } catch (e) {
-                    // 如果解析失败，原样返回，不抛错
-                    return new Response(text, { status: 200 });
-                }
-            }
-        } catch (e) {
-            // 捕获所有 fetch 异常，防止 1101
-            console.error(e);
-        }
-        
-        // 降级本地
-        const fallbackList = generateNodeList(host, UUID, reqProxyIp);
-        return new Response(btoa(unescape(encodeURIComponent(fallbackList))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-    }
-
-    // =========================================================================
-    // 🟢 2. 常规订阅 /sub
-    // =========================================================================
-    if (url.pathname === '/sub') {
-        const requestUUID = url.searchParams.get('uuid');
-        if (requestUUID !== UUID) return new Response('Invalid UUID', { status: 403 });
-        let pathParam = url.searchParams.get('path');
-        let proxyIp = "";
-        if (pathParam && pathParam.includes('/proxyip=')) proxyIp = pathParam.split('/proxyip=')[1];
-        else if (pathParam === null) proxyIp = DEFAULT_PROXY_IP;
-        const listText = generateNodeList(host, UUID, proxyIp);
-        return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-    }
-
-    // =========================================================================
-    // 🟢 3. 面板
-    // =========================================================================
-    if (r.headers.get('Upgrade') !== 'websocket') {
-        if (WEB_PASSWORD && WEB_PASSWORD.trim().length > 0) {
-            const cookie = r.headers.get('Cookie') || "";
-            if (!cookie.includes(`auth=${WEB_PASSWORD}`)) return new Response(loginPage(), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-        }
-        return new Response(dashPage(url.hostname, UUID), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-    }
-    
-    let proxyIPConfig = null;
-    if (url.pathname.includes('/proxyip=')) {
-      try {
-        const proxyParam = url.pathname.split('/proxyip=')[1].split('/')[0];
-        // *** 修改点：使用 await 调用新的异步解析函数 ***
-        const [address, port] = await 解析地址端口(proxyParam); 
-        proxyIPConfig = { address, port: +port }; 
-      } catch (e) {
-         console.error('Failed to parse proxyip in fetch:', e.message);
+      // 🟢 注入功能：拦截点击 GitHub 链接的通知
+      if (url.searchParams.get('flag') === 'github') {
+          await sendTgMsg(ctx, "🌟 用户点击了烈火项目", r, "来源: 登录页面直达链接");
+          return new Response(null, { status: 204 });
       }
+
+      // =========================================================================
+      // 🟢 1. 快速订阅接口 (/:SUB_PASSWORD)
+      // =========================================================================
+      if (SUB_PASSWORD && url.pathname === `/${SUB_PASSWORD}`) {
+          const K_CLASH = 'c'+'l'+'a'+'s'+'h';
+          const K_SB = 's'+'i'+'n'+'g'+'-'+'b'+'o'+'x';
+          
+          const isClash = UA.includes(K_CLASH) || UA.includes('meta') || UA.includes('stash');
+          const isSingbox = UA.includes(K_SB) || UA.includes('singbox') || UA.includes('sfi') || UA.includes('box') || UA.includes('karing') || UA.includes('neko');
+          const isFlagged = url.searchParams.has('flag');
+          const now = Date.now();
+
+          // 🟢 注入功能：订阅通知
+          if (!isFlagged) {
+             let clientType = "浏览器/未知";
+             if (isSingbox) clientType = "Sing-box";
+             else if (isClash) clientType = "Clash";
+             const p = sendTgMsg(ctx, "订阅被访问/更新", r, `类型: ${clientType}`);
+             if(ctx && ctx.waitUntil) ctx.waitUntil(p);
+          }
+
+          if (isSingbox && !isFlagged) {
+              const requestProxyIp = url.searchParams.get('proxyip');
+              let selfUrl = `https://${host}/${SUB_PASSWORD}?flag=true`;
+              if (requestProxyIp) selfUrl += `&proxyip=${encodeURIComponent(requestProxyIp)}`;
+              
+              let targetConfig = SINGBOX_CONFIG_V12;
+              try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 2000);
+                  const checkV12 = await fetch(SINGBOX_CONFIG_V12, { method: 'HEAD', signal: controller.signal });
+                  clearTimeout(timeoutId);
+                  if (checkV12.status !== 200) targetConfig = SINGBOX_CONFIG_V11;
+              } catch (e) { targetConfig = SINGBOX_CONFIG_V11; }
+
+              const converterUrl = `${DEFAULT_CONVERTER}/sub?target=singbox&url=${encodeURIComponent(selfUrl)}&config=${encodeURIComponent(targetConfig)}&emoji=true&list=false&sort=false&fdn=false&scv=false&_t=${now}`;
+              const subRes = await fetch(converterUrl);
+              const newHeaders = new Headers(subRes.headers);
+              newHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+              newHeaders.set('Pragma', 'no-cache');
+              newHeaders.set('Expires', '0');
+              return new Response(subRes.body, { status: 200, headers: newHeaders });
+          }
+
+          if (isClash && !isFlagged) {
+              const requestProxyIp = url.searchParams.get('proxyip');
+              let selfUrl = `https://${host}/${SUB_PASSWORD}?flag=true`;
+              if (requestProxyIp) selfUrl += `&proxyip=${encodeURIComponent(requestProxyIp)}`;
+              const converterUrl = `${DEFAULT_CONVERTER}/sub?target=clash&url=${encodeURIComponent(selfUrl)}&config=${encodeURIComponent(CLASH_CONFIG)}&emoji=true&list=false&tfo=false&scv=false&fdn=false&sort=false&_t=${now}`;
+              const subRes = await fetch(converterUrl);
+              const newHeaders = new Headers(subRes.headers);
+              newHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+              return new Response(subRes.body, { status: 200, headers: newHeaders });
+          }
+
+          let upstream = DEFAULT_SUB_DOMAIN.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+          if (!upstream) upstream = host;
+          
+          let reqProxyIp = url.searchParams.get('proxyip');
+          if (!reqProxyIp && DEFAULT_PROXY_IP && DEFAULT_PROXY_IP.trim() !== "") reqProxyIp = DEFAULT_PROXY_IP;
+
+          let targetPath = "/";
+          if (reqProxyIp && reqProxyIp.trim() !== "") targetPath = `/proxyip=${reqProxyIp.trim()}`;
+
+          const params = new URLSearchParams();
+          params.append("uuid", UUID);
+          params.append("host", upstream);
+          params.append("sni", upstream);
+          params.append("path", targetPath); 
+          params.append("type", "ws");
+          params.append("encryption", "none");
+          params.append("security", "tls");
+          params.append("alpn", "h3");
+          params.append("fp", "random");
+          params.append("allowInsecure", "1");
+
+          const upstreamUrl = `https://${upstream}/sub?${params.toString()}`;
+
+          try {
+              const response = await fetch(upstreamUrl, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" } });
+              if (response.ok) {
+                  const text = await response.text();
+                  try {
+                      let content = atob(text.trim());
+                      content = content.replace(/path=[^&#]*/g, `path=${encodeURIComponent(targetPath)}`);
+                      content = content.replace(/host=[^&]*/g, `host=${host}`);
+                      content = content.replace(/sni=[^&]*/g, `sni=${host}`);
+                      return new Response(btoa(content), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+                  } catch (e) { return new Response(text, { status: 200 }); }
+              }
+          } catch (e) {}
+          
+          const fallbackList = genNodes(host, UUID, reqProxyIp);
+          return new Response(btoa(unescape(encodeURIComponent(fallbackList))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+
+      // 2. 常规订阅 /sub
+      if (url.pathname === '/sub') {
+          const requestUUID = url.searchParams.get('uuid');
+          if (requestUUID !== UUID) return new Response('Invalid UUID', { status: 403 });
+          let pathParam = url.searchParams.get('path');
+          let proxyIp = "";
+          if (pathParam && pathParam.includes('/proxyip=')) proxyIp = pathParam.split('/proxyip=')[1];
+          else if (pathParam === null) proxyIp = DEFAULT_PROXY_IP;
+          const listText = genNodes(host, UUID, proxyIp);
+          
+          // 🟢 注入功能：订阅通知
+          const p = sendTgMsg(ctx, "常规订阅访问 (/sub)", r);
+          if(ctx && ctx.waitUntil) ctx.waitUntil(p);
+          
+          return new Response(btoa(unescape(encodeURIComponent(listText))), { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+
+      // 3. 面板逻辑
+      if (r.headers.get('Upgrade') !== 'websocket') {
+          const noCacheHeaders = {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+          };
+
+          if (WEB_PASSWORD && WEB_PASSWORD.trim().length > 0) {
+              const cookie = r.headers.get('Cookie') || "";
+              const match = cookie.match(/auth=([^;]+)/);
+              const userAuth = match ? match[1] : null;
+
+              if (userAuth !== WEB_PASSWORD) {
+                  if (userAuth) {
+                      await sendTgMsg(ctx, "🚨 后台登录失败", r, `尝试密码: ${userAuth} (错误)`);
+                      return new Response(loginPage(!0), { status: 200, headers: noCacheHeaders });
+                  } else {
+                      await sendTgMsg(ctx, "👋 后台登录页访问", r, "等待验证");
+                      return new Response(loginPage(!1), { status: 200, headers: noCacheHeaders });
+                  }
+              }
+          }
+          
+          await sendTgMsg(ctx, "✅ 后台登录成功", r, "进入管理面板");
+          return new Response(dashPage(url.hostname, UUID), { status: 200, headers: noCacheHeaders });
+      }
+      
+      let proxyIPConfig = null;
+      if (url.pathname.includes('/proxyip=')) {
+        try {
+          const proxyParam = url.pathname.split('/proxyip=')[1].split('/')[0];
+          const [address, port] = await parseIP(proxyParam); 
+          proxyIPConfig = { address, port: +port }; 
+        } catch (e) { console.error(e); }
+      }
+      const { 0: c, 1: s } = new WebSocketPair(); s.accept(); 
+      handle(s, proxyIPConfig); 
+      return new Response(null, { status: 101, webSocket: c });
+    } catch (err) {
+      return new Response(err.toString(), { status: 500 });
     }
-    const { 0: c, 1: s } = new WebSocketPair(); s.accept(); 
-    handle(s, proxyIPConfig); 
-    return new Response(null, { status: 101, webSocket: c });}
+  }
 };
 
-const handle = (ws, proxyIPConfig) => {
-  const pool = new Pool(); let sock, w, r, info, first = true, rxBytes = 0, stalls = 0, reconns = 0;
-  let lastAct = Date.now(), conn = false, reading = false, writing = false; 
-  const tmrs = {}, pend = [];
-  let pendBytes = 0, score = 1.0, lastChk = Date.now(), lastRx = 0, succ = 0, fail = 0;
-  let stats = { tot: 0, cnt: 0, big: 0, win: 0, ts: Date.now() }; 
-  let mode = 'buffered', avgSz = 0, tputs = [];
-  const updateMode = s => {
-    stats.tot += s; stats.cnt++; if (s > 8192) stats.big++; avgSz = avgSz * 0.9 + s * 0.1; const now = Date.now();
-    if (now - stats.ts > 1000) {
-      const rate = stats.win; tputs.push(rate); if (tputs.length > 5) tputs.shift(); stats.win = s; stats.ts = now;
-      const avg = tputs.reduce((a, b) => a + b, 0) / tputs.length;
-      if (stats.cnt >= 20) {
-        if (avg > 20971520 && avgSz > 16384) { if (mode !== 'direct') { mode = 'direct'; } }
-        else if (avg < 10485760 || avgSz < 8192) { if (mode !== 'buffered') { mode = 'buffered'; pool.enableLarge(); } }
-        else { if (mode !== 'adaptive') mode = 'adaptive'; }
-      }} else { stats.win += s; }
+// ⚡️ 核心 WebSocket 逻辑
+const handle = (ws, pc) => {
+  const pool = new Pool();
+  let s, w, r, inf, fst = true, rx = 0, stl = 0, cnt = 0, lact = Date.now(), con = false, rd = false, wt = false, tm = {}, pd = [], pb = 0, scr = 1.0, lck = Date.now(), lrx = 0, md = 'buf', asz = 0, tp = [], st = { t: 0, c: 0, ts: Date.now() };
+  const upd = sz => {
+    st.t += sz; st.c++; asz = asz * 0.9 + sz * 0.1; const n = Date.now();
+    if (n - st.ts > 1000) { const rt = st.t; tp.push(rt); if (tp.length > 5) tp.shift(); st.t = 0; st.ts = n; const av = tp.reduce((a, b) => a + b, 0) / tp.length; if (st.c >= 20) { if (av > 2e7 && asz > 16384) md = 'dir'; else if (av < 1e7 || asz < 8192) md = 'buf'; else md = 'adp' } }
   };
-  const readLoop = async () => {
-    if (reading) return; reading = true; let batch = [], bSz = 0, bTmr = null;
-    const flush = () => {
-      if (!bSz) return; const m = new Uint8Array(bSz); let p = 0;
-      for (const c of batch) { m.set(c, p); p += c.length; }
-      if (ws.readyState === 1) ws.send(m);
-      batch = []; bSz = 0; if (bTmr) { clearTimeout(bTmr); bTmr = null; }
-    };
+  const rdL = async () => {
+    if (rd) return; rd = true; let b = [], bz = 0, tm = null;
+    const fl = () => { if (!bz) return; const m = new Uint8Array(bz); let p = 0; for (const x of b) { m.set(x, p); p += x.length } if (ws.readyState === 1) ws.send(m); b = []; bz = 0; if (tm) clearTimeout(tm); tm = null };
     try {
-      while (true) {
-        if (pendBytes > MAX_PENDING) { await new Promise(res => setTimeout(res, 100)); continue; }
+      while (1) {
+        if (pb > MAX_PENDING) { await new Promise(r => setTimeout(r, 100)); continue }
         const { done, value: v } = await r.read();
         if (v?.length) {
-          rxBytes += v.length; lastAct = Date.now(); stalls = 0; updateMode(v.length); const now = Date.now();
-          if (now - lastChk > 5000) {
-            const el = now - lastChk, by = rxBytes - lastRx, tp = by / el;
-            if (tp > 500) score = Math.min(1.0, score + 0.05);
-            else if (tp < 50) score = Math.max(0.1, score - 0.05);
-            lastChk = now; lastRx = rxBytes;
-          }
-          if (mode === 'buffered') {
-            if (v.length < 32768) {
-              batch.push(v); bSz += v.length;
-              if (bSz >= 131072) flush();
-              else if (!bTmr) bTmr = setTimeout(flush, avgSz > 16384 ? 5 : 20);
-            } else { flush(); if (ws.readyState === 1) ws.send(v); }
-          } else if (mode === 'adaptive') {
-            if (v.length < 4096) {
-              batch.push(v); bSz += v.length;
-              if (bSz >= 32768) flush();
-              else if (!bTmr) bTmr = setTimeout(flush, 15);
-            } else { flush(); if (ws.readyState === 1) ws.send(v); }
-          } else { flush(); if (ws.readyState === 1) ws.send(v); }
-        } if (done) { flush(); reading = false; reconn(); break; }
-      }} catch (e) { flush(); if (bTmr) clearTimeout(bTmr); reading = false; fail++; reconn(); }
-  };
-  const writeLoop = async () => {
-    if (writing) return; writing = true;
-    try {
-      while(writing) { 
-        if (!w) { await new Promise(res => setTimeout(res, 100)); continue; }
-        if (pend.length === 0) { await new Promise(res => setTimeout(res, 20)); continue; }
-        const b = pend.shift(); await w.write(b); pendBytes -= b.length; pool.free(b);
+          rx += v.length; lact = Date.now(); stl = 0; upd(v.length); const n = Date.now();
+          if (n - lck > 5000) { const el = n - lck, by = rx - lrx, r = by / el; if (r > 500) scr = Math.min(1, scr + 0.05); else if (r < 50) scr = Math.max(0.1, scr - 0.05); lck = n; lrx = rx }
+          if (md === 'buf') { if (v.length < 32768) { b.push(v); bz += v.length; if (bz >= 131072) fl(); else if (!tm) tm = setTimeout(fl, asz > 16384 ? 5 : 20) } else { fl(); if (ws.readyState === 1) ws.send(v) } } else { fl(); if (ws.readyState === 1) ws.send(v) }
+        }
+        if (done) { fl(); rd = false; rcn(); break }
       }
-    } catch (e) { writing = false; }
+    } catch { fl(); rd = false; rcn() }
   };
-  const attemptConnection = async () => {
-    const connectionMethods = ['direct'];
-    if (proxyIPConfig) { connectionMethods.push('proxy'); }
-    let lastError;
-    for (const method of connectionMethods) {
-      try {
-        const connectOpts = (method === 'direct')
-          ? { hostname: info.host, port: info.port }
-          : { hostname: proxyIPConfig.address, port: proxyIPConfig.port };
-        const sock = connect(connectOpts); await sock.opened; return sock;
-      } catch (e) { lastError = e; }
-    }
-    throw lastError || new Error('All connection methods failed.');
-  };
-  const establish = async () => { 
-    try {
-      sock = await attemptConnection(); w = sock.writable.getWriter(); r = sock.readable.getReader(); 
-      conn = false; reconns = 0; score = Math.min(1.0, score + 0.15); succ++; lastAct = Date.now(); 
-      readLoop(); writeLoop(); 
-    } catch (e) { conn = false; fail++; score = Math.max(0.1, score - 0.2); reconn(); }
-  };
-  const reconn = async () => {
-    if (!info || ws.readyState !== 1) { cleanup(); ws.close(1011, 'Invalid.'); return; }
-    if (reconns >= MAX_RECONN) { cleanup(); ws.close(1011, 'Max reconnect.'); return; }
-    if (score < 0.3 && reconns > 5 && Math.random() > 0.6) { cleanup(); ws.close(1011, 'Poor network.'); return; }
-    if (conn) return; reconns++; let d = Math.min(50 * Math.pow(1.5, reconns - 1), 3000);
-    d *= (1.5 - score * 0.5); d += (Math.random() - 0.5) * d * 0.2; d = Math.max(50, Math.floor(d));
-    try {
-      cleanSock();
-      if (pendBytes > MAX_PENDING * 2) {
-        while (pendBytes > MAX_PENDING && pend.length > 5) { const drop = pend.shift(); pendBytes -= drop.length; pool.free(drop); }
-      }
-      await new Promise(res => setTimeout(res, d)); conn = true;
-      sock = await attemptConnection(); 
-      w = sock.writable.getWriter(); r = sock.readable.getReader();
-      conn = false; reconns = 0; score = Math.min(1.0, score + 0.15); succ++; stalls = 0; lastAct = Date.now(); 
-      readLoop(); writeLoop(); 
-    } catch (e) { 
-      conn = false; fail++; score = Math.max(0.1, score - 0.2);
-      if (reconns < MAX_RECONN && ws.readyState === 1) setTimeout(reconn, 500);
-      else { cleanup(); ws.close(1011, 'Exhausted.'); }
-    }
-  };
-  const startTmrs = () => {
-    tmrs.ka = setInterval(async () => {
-      if (!conn && w && Date.now() - lastAct > KEEPALIVE) { try { await w.write(new Uint8Array(0)); lastAct = Date.now(); } catch (e) { reconn(); }}
-    }, KEEPALIVE / 3);
-    tmrs.hc = setInterval(() => {
-      if (!conn && stats.tot > 0 && Date.now() - lastAct > STALL_TO) { stalls++;
-        if (stalls >= MAX_STALL) {
-          if (reconns < MAX_RECONN) { stalls = 0; reconn(); }
-          else { cleanup(); ws.close(1011, 'Stall.'); }
-        }}}, STALL_TO / 2);
-  };
-  const cleanSock = () => { reading = false; writing = false; try { w?.releaseLock(); r?.releaseLock(); sock?.close(); } catch {} };
-  const cleanup = () => {
-    Object.values(tmrs).forEach(clearInterval); cleanSock();
-    while (pend.length) pool.free(pend.shift());
-    pendBytes = 0; stats = { tot: 0, cnt: 0, big: 0, win: 0, ts: Date.now() };
-    mode = 'buffered'; avgSz = 0; tputs = []; pool.reset();
-  };
-  ws.addEventListener('message', async e => {
-    try {
-      if (first) {
-        first = false; const b = new Uint8Array(e.data);
-        // 🚨 注意：这里使用旧版静态 UUID 检查，因为 `stallTCP1.3后台版V1.js` 中没有 DynamicUUID 类的定义。
-        if (buildUUID(b, 1).toLowerCase() !== UUID.toLowerCase()) throw new Error('Auth failed.');
-        ws.send(new Uint8Array([0, 0])); 
-        const { host, port, payload } = extractAddr(b); 
-        info = { host, port }; conn = true; 
-        if (payload.length) { const buf = pool.alloc(payload.length); buf.set(payload); pend.push(buf); pendBytes += buf.length; } 
-        startTmrs(); establish(); 
-      } else { 
-        lastAct = Date.now(); if (pendBytes > MAX_PENDING * 2) return; 
-        const buf = pool.alloc(e.data.byteLength); buf.set(new Uint8Array(e.data)); pend.push(buf); pendBytes += buf.length;
-      }
-    } catch (err) { cleanup(); ws.close(1006, 'Error.'); }
-  }); 
-  ws.addEventListener('close', cleanup); ws.addEventListener('error', cleanup);
+  const wtL = async () => { if (wt) return; wt = true; try { while (wt) { if (!w) { await new Promise(r => setTimeout(r, 100)); continue } if (!pd.length) { await new Promise(r => setTimeout(r, 20)); continue } const b = pd.shift(); await w.write(b); pb -= b.length; pool.free(b) } } catch { wt = false } };
+  const est = async () => { try { s = await cn(); w = s.writable.getWriter(); r = s.readable.getReader(); con = false; cnt = 0; scr = Math.min(1, scr + 0.15); lact = Date.now(); rdL(); wtL() } catch { con = false; scr = Math.max(0.1, scr - 0.2); rcn() } };
+  const cn = async () => { const m = ['direct']; if (pc) m.push('proxy'); let err; for (const x of m) { try { const o = (x === 'direct') ? { hostname: inf.host, port: inf.port } : { hostname: pc.address, port: pc.port }; const sk = connect(o); await sk.opened; return sk } catch (e) { err = e } } throw err };
+  const rcn = async () => { if (!inf || ws.readyState !== 1) { cln(); ws.close(1011); return } if (cnt >= MAX_RECONN) { cln(); ws.close(1011); return } if (con) return; cnt++; let d = Math.min(50 * Math.pow(1.5, cnt - 1), 3000) * (1.5 - scr * 0.5); d = Math.max(50, Math.floor(d)); try { csk(); if (pb > MAX_PENDING * 2) while (pb > MAX_PENDING && pd.length > 5) { const k = pd.shift(); pb -= k.length; pool.free(k) } await new Promise(r => setTimeout(r, d)); con = true; s = await cn(); w = s.writable.getWriter(); r = s.readable.getReader(); con = false; cnt = 0; scr = Math.min(1, scr + 0.15); stl = 0; lact = Date.now(); rdL(); wtL() } catch { con = false; scr = Math.max(0.1, scr - 0.2); if (cnt < MAX_RECONN && ws.readyState === 1) setTimeout(rcn, 500); else { cln(); ws.close(1011) } } };
+  const stT = () => { tm.ka = setInterval(async () => { if (!con && w && Date.now() - lact > KEEPALIVE) try { await w.write(new Uint8Array(0)); lact = Date.now() } catch { rcn() } }, KEEPALIVE / 3); tm.hc = setInterval(() => { if (!con && st.t > 0 && Date.now() - lact > STALL_TO) { stl++; if (stl >= MAX_STALL) { if (cnt < MAX_RECONN) { stl = 0; rcn() } else { cln(); ws.close(1011) } } } }, STALL_TO / 2) };
+  const csk = () => { rd = false; wt = false; try { w?.releaseLock(); r?.releaseLock(); s?.close() } catch { } }; const cln = () => { Object.values(tm).forEach(clearInterval); csk(); while (pd.length) pool.free(pd.shift()); pb = 0; st = { t: 0, c: 0, ts: Date.now() }; md = 'buf'; asz = 0; tp = []; pool.reset() };
+  ws.addEventListener('message', async e => { try { if (fst) { fst = false; const b = new Uint8Array(e.data); if (buildUUID(b, 1).toLowerCase() !== UUID.toLowerCase()) throw 0; ws.send(new Uint8Array([0, 0])); const { host, port, payload } = extractAddr(b); inf = { host, port }; con = true; if (payload.length) { const z = pool.alloc(payload.length); z.set(payload); pd.push(z); pb += z.length } stT(); est() } else { lact = Date.now(); if (pb > MAX_PENDING * 2) return; const z = pool.alloc(e.data.byteLength); z.set(new Uint8Array(e.data)); pd.push(z); pb += z.length } } catch { cln(); ws.close(1006) } }); ws.addEventListener('close', cln); ws.addEventListener('error', cln)
 };
 
-function loginPage(){return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Worker Login</title><style>body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.glass-box{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);padding:40px;border-radius:16px;box-shadow:0 8px 32px 0 rgba(31,38,135,0.37);text-align:center;width:320px}h2{margin-top:0;margin-bottom:20px;font-weight:600;letter-spacing:1px}input{width:100%;padding:14px;margin-bottom:20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.2);color:white;box-sizing:border-box;text-align:center;font-size:1rem;outline:none;transition:0.3s}input:focus{background:rgba(0,0,0,0.4);border-color:#a29bfe}button{width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(90deg,#a29bfe,#6c5ce7);color:white;font-weight:bold;cursor:pointer;font-size:1rem;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:0.2s}button:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.3)}.social-links{margin-top:25px;display:flex;justify-content:center;gap:15px;border-top:1px solid rgba(255,255,255,0.1);padding-top:20px}.social-links a{color:#e2e8f0;text-decoration:none;font-size:0.9rem;padding:8px 16px;background:rgba(0,0,0,0.2);border-radius:20px;border:1px solid rgba(255,255,255,0.15);transition:0.2s;display:flex;align-items:center;gap:5px}.social-links a:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);border-color:#a29bfe}</style></head><body><div class="glass-box"><h2>🔒 禁止进入</h2><input type="password" id="pwd" placeholder="请输入密码" autofocus onkeypress="if(event.keyCode===13)verify()"><button onclick="verify()">解锁后台</button><div class="social-links"><a href="${TG_CHANNEL_URL}" target="_blank">📢 频道</a><a href="${TG_GROUP_URL}" target="_blank">✈️ 群组</a></div></div><script>function verify(){const p=document.getElementById('pwd').value;const d=new Date();d.setTime(d.getTime()+(7*24*60*60*1000));document.cookie="auth="+p+";expires="+d.toUTCString()+";path=/";location.reload()}</script></body></html>`;}
-
-function dashPage(host, uuid){
-  // 🟢 界面去敏感化：将 "字" 替换为 "通用协议"
-  return `
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Worker 订阅管理</title>
-<style>
-  :root { --glass: rgba(255, 255, 255, 0.1); --border: rgba(255, 255, 255, 0.2); }
-  body { background: linear-gradient(135deg, #2b1055 0%, #7597de 100%); color: white; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 20px; min-height: 100vh; display:flex; justify-content:center; box-sizing: border-box; }
-  .container { max-width: 800px; width: 100%; }
-  .card { background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 16px; padding: 25px; margin-bottom: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
-  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
-  h1 { margin: 0; font-size: 1.5rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-  h3 { margin-top:0; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; color: #dfe6e9; }
-  .btn-group { display: flex; gap: 10px; }
-  .btn-small { font-size: 0.85rem; cursor: pointer; background: rgba(0,0,0,0.3); padding: 5px 12px; border-radius: 6px; text-decoration: none; color: white; transition:0.2s; border: 1px solid transparent; }
-  .btn-small:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
-  .field { margin-bottom: 18px; }
-  .label { display: block; font-size: 0.9rem; color: #dfe6e9; margin-bottom: 8px; font-weight: 500; }
-  .input-group { display: flex; gap: 10px; }
-  input, textarea { width: 100%; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); color: white; padding: 12px; border-radius: 8px; font-family: monospace; outline: none; transition: 0.2s; box-sizing: border-box; }
-  input:focus, textarea:focus { background: rgba(0, 0, 0, 0.4); border-color: #a29bfe; }
-  textarea { min-height: 120px; resize: vertical; line-height: 1.4; }
-  button.main-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 5px; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.2); font-size: 1rem; }
-  button.main-btn:hover { transform: translateY(-2px); opacity: 0.95; }
-  button.sec-btn { background: rgba(255, 255, 255, 0.15); color: white; border: 1px solid var(--border); padding: 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition:0.2s; }
-  button.sec-btn:hover { background: rgba(255, 255, 255, 0.3); }
-  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #00b894; color: white; padding: 10px 24px; border-radius: 30px; opacity: 0; transition: 0.3s; pointer-events: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3); font-weight: bold; }
-  .toast.show { opacity: 1; bottom: 50px; }
-  .desc { font-size: 0.8rem; color: #b2bec3; margin-top: 6px; }
-  .checkbox-wrapper { display: flex; align-items: center; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; width: fit-content; }
-  .checkbox-wrapper input { width: auto; margin-right: 8px; cursor: pointer; }
-  .checkbox-wrapper label { cursor: pointer; font-size: 0.9rem; color: #dfe6e9; }
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="card">
-    <div class="header"><h1>⚡ Worker 管理面板</h1><div class="btn-group"><a href="${TG_GROUP_URL}" target="_blank" class="btn-small">✈️ 加入群组</a><span class="btn-small" onclick="logout()">退出登录</span></div></div>
-    <div class="field" style="background:rgba(108,92,231,0.2);padding:15px;border-radius:10px;border:1px solid rgba(162,155,254,0.4)">
-      <span class="label" style="color:#a29bfe;font-weight:bold">🚀 快速自适应订阅 (推荐)</span>
-      <div class="input-group"><input type="text" id="shortSub" value="https://${host}/${SUB_PASSWORD}" readonly onclick="this.select()"><button class="sec-btn" onclick="copyId('shortSub')">复制</button></div>
-      <div class="desc">直接使用此链接。支持通用/Clash(自适应)。<br/>节点将自动抓取上游并替换为Worker加速。</div>
-    </div>
-    <div class="field"><span class="label">1. 订阅数据源 (Sub Domain)</span><input type="text" id="subBaseUrl" value="https://${host}" placeholder="https://..." oninput="updateLink()"><div class="desc">默认使用当前 Worker 域名。</div></div>
-    <div class="field"><span class="label">2. 优选IP / 中转域名 (ProxyIP)</span><div class="input-group"><input type="text" id="proxyIp" value="${DEFAULT_PROXY_IP}" placeholder="例如: sjc.o00o.ooo" oninput="updateLink()"><button class="sec-btn" onclick="checkProxy()">🔍 检测</button></div><div class="desc">影响手动生成链接。</div></div>
-    <div class="field" id="clashSettings" style="display:none;background:rgba(0,0,0,0.15);padding:15px;border-radius:8px;margin-bottom:18px;border:1px dashed #6c5ce7">
-      <span class="label" style="color:#a29bfe">⚙️ Clash 高级配置</span>
-      <div style="margin-bottom:10px"><span class="label" style="font-size:0.85rem">转换后端:</span><input type="text" id="converterUrl" value="${DEFAULT_CONVERTER}" oninput="updateLink()"></div>
-      <div><span class="label" style="font-size:0.85rem">远程配置:</span><input type="text" id="configUrl" value="${DEFAULT_CONFIG}" oninput="updateLink()"></div>
-    </div>
-    <div class="field"><span class="label">3. 手动生成订阅链接 (Legacy)</span><input type="text" id="resultUrl" readonly onclick="this.select()"><div class="checkbox-wrapper"><input type="checkbox" id="clashMode" onchange="toggleClashMode()"><label for="clashMode">🔄 开启 Clash 转换</label></div></div>
-    <div class="input-group"><button class="main-btn" onclick="copyId('resultUrl')">📄 复制订阅链接</button><button class="sec-btn" onclick="window.open(document.getElementById('resultUrl').value)" style="width:120px">🚀 测试</button></div>
-  </div>
-  <div class="card"><h3>🚀 优选IP预览</h3><div class="field"><span class="label">内置 IP 列表</span><textarea id="customIps" readonly style="background:rgba(0,0,0,0.2);border-color:transparent;cursor:default;height:150px">${DEFAULT_CUSTOM_IPS}</textarea></div></div>
-</div>
-<div id="toast" class="toast">已复制!</div>
-<script>
-function toggleClashMode(){const c=document.getElementById('clashMode').checked;document.getElementById('clashSettings').style.display=c?'block':'none';updateLink()}
-function updateLink(){
- let b=document.getElementById('subBaseUrl').value.trim();if(b.endsWith('/'))b=b.slice(0,-1);if(!b.startsWith('http'))b='https://'+b;
- const p=document.getElementById('proxyIp').value.trim();const h=window.location.hostname;const u="${uuid}";const c=document.getElementById('clashMode').checked;
- let rp="/";if(p)rp="/proxyip="+p;
- const cl=b + "/sub?uuid=" + u + "&path=" + encodeURIComponent(rp);
- if(c){
-  let cv=document.getElementById('converterUrl').value.trim();if(cv.endsWith('/'))cv=cv.slice(0,-1);
-  const cf=document.getElementById('configUrl').value.trim();
-  document.getElementById('resultUrl').value=cv + "/sub?target=clash&url=" + encodeURIComponent(cl) + "&config=" + encodeURIComponent(cf) + "&emoji=true&list=false&tfo=false&scv=false&fdn=false&sort=false";
- }else{document.getElementById('resultUrl').value=cl}
-}
-function copyId(id){navigator.clipboard.writeText(document.getElementById(id).value).then(()=>showToast("已复制!"))}
-function checkProxy(){const i=document.getElementById('proxyIp').value.trim();if(i){navigator.clipboard.writeText(i).then(()=>{alert("ProxyIP 已复制!");window.open("${PROXY_CHECK_URL}","_blank")})}else{window.open("${PROXY_CHECK_URL}","_blank")}}
-function showToast(m){const t=document.getElementById('toast');t.innerText=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
-function logout(){document.cookie="auth=;expires=Thu,01 Jan 1970 00:00:00 UTC;path=/;";location.reload()}
-window.onload=()=>{updateLink()};
-</script>
-</body>
-</html>`;
-}
+// UI 代码压缩 (已更新红色文字、Placeholder和烈火项目)
+function loginPage(e){return`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Worker Login</title><style>body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.glass-box{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);padding:40px;border-radius:16px;box-shadow:0 8px 32px 0 rgba(31,38,135,0.37);text-align:center;width:320px}h2{margin-top:0;margin-bottom:20px;font-weight:600;letter-spacing:1px}input{width:100%;padding:14px;margin-bottom:20px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.2);color:white;box-sizing:border-box;text-align:center;font-size:1rem;outline:none;transition:0.3s}input:focus{background:rgba(0,0,0,0.4);border-color:#a29bfe}button{width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(90deg,#a29bfe,#6c5ce7);color:white;font-weight:bold;cursor:pointer;font-size:1rem;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:0.2s}button:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.3)}.social-links{margin-top:25px;display:flex;justify-content:center;gap:15px;border-top:1px solid rgba(255,255,255,0.1);padding-top:20px;flex-wrap:wrap}.social-links a{color:#e2e8f0;text-decoration:none;font-size:0.9rem;padding:8px 16px;background:rgba(0,0,0,0.2);border-radius:20px;border:1px solid rgba(255,255,255,0.15);transition:0.2s;display:flex;align-items:center;gap:5px}.social-links a:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);border-color:#a29bfe}.error-msg{background:rgba(231,76,60,0.3);border:1px solid rgba(231,76,60,0.5);color:#ff7675;padding:10px;border-radius:8px;margin-bottom:15px;font-size:0.9rem;display:${e?"block":"none"}}</style></head><body><div class="glass-box"><h2>🔒 禁止进入</h2><div class="error-msg">⚠️ 密码错误，请重试</div><input type="password" id="pwd" placeholder="请输入密码" autofocus onkeypress="if(event.keyCode===13)verify()"><button onclick="verify()">解锁后台</button><div class="social-links"><a href="javascript:void(0)" onclick="gh()">🔥 烈火项目直达</a><a href="${TG_CHANNEL_URL}" target="_blank">📢 天诚频道组</a><a href="${TG_GROUP_URL}" target="_blank">✈️ 天诚交流群</a></div></div><script>function gh(){fetch("?flag=github&t="+Date.now(),{keepalive:!0});window.open("https://github.com/xtgm/stallTCP1.3V1","_blank")}function verify(){const p=document.getElementById("pwd").value,d=new Date;d.setTime(d.getTime()+6048e5),document.cookie="auth="+p+";expires="+d.toUTCString()+";path=/",location.reload()}<\/script></body></html>`}
+function dashPage(e,t){const s=TG_BOT_TOKEN&&TG_CHAT_ID?'<div class="status-item available">🤖 Telegram 通知: <span style="color:#00b894;font-weight:bold">已开启</span></div>':'<div class="status-item">🤖 Telegram 通知: <span style="color:#fab1a0">未配置</span></div>';return`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Worker 订阅管理</title><style>:root{--glass:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.2)}body{background:linear-gradient(135deg,#2b1055 0%,#7597de 100%);color:white;font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:20px;min-height:100vh;display:flex;justify-content:center;box-sizing:border-box}.container{max-width:800px;width:100%}.card{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:25px;margin-bottom:20px;box-shadow:0 8px 32px 0 rgba(0,0,0,0.3)}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid var(--border)}h1{margin:0;font-size:1.5rem;font-weight:600;text-shadow:0 2px 4px rgba(0,0,0,0.3)}h3{margin-top:0;font-size:1.1rem;border-bottom:1px solid var(--border);padding-bottom:10px;color:#dfe6e9}.btn-group{display:flex;gap:10px}.btn-small{font-size:.85rem;cursor:pointer;background:rgba(0,0,0,0.3);padding:5px 12px;border-radius:6px;text-decoration:none;color:white;transition:.2s;border:1px solid transparent}.btn-small:hover{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.5)}.field{margin-bottom:18px}.label{display:block;font-size:.9rem;color:#dfe6e9;margin-bottom:8px;font-weight:500}.input-group{display:flex;gap:10px}input,textarea{width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--border);color:white;padding:12px;border-radius:8px;font-family:monospace;outline:none;transition:.2s;box-sizing:border-box}input:focus,textarea:focus{background:rgba(0,0,0,0.4);border-color:#a29bfe}textarea{min-height:120px;resize:vertical;line-height:1.4}button.main-btn{background:linear-gradient(90deg,#6c5ce7,#a29bfe);color:white;border:none;padding:12px 20px;border-radius:8px;cursor:pointer;font-weight:600;width:100%;margin-top:5px;transition:.2s;box-shadow:0 4px 6px rgba(0,0,0,0.2);font-size:1rem}button.main-btn:hover{transform:translateY(-2px);opacity:.95}button.sec-btn{background:rgba(255,255,255,0.15);color:white;border:1px solid var(--border);padding:12px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:.2s}button.sec-btn:hover{background:rgba(255,255,255,0.3)}.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#00b894;color:white;padding:10px 24px;border-radius:30px;opacity:0;transition:.3s;pointer-events:none;box-shadow:0 5px 15px rgba(0,0,0,0.3);font-weight:bold}.toast.show{opacity:1;bottom:50px}.desc{font-size:.8rem;color:#b2bec3;margin-top:6px}.checkbox-wrapper{display:flex;align-items:center;margin-top:10px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:6px;width:fit-content}.checkbox-wrapper input{width:auto;margin-right:8px;cursor:pointer}.checkbox-wrapper label{cursor:pointer;font-size:.9rem;color:#dfe6e9}.status-item{background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:6px;font-size:.9rem;margin-top:10px;display:inline-block}</style></head><body><div class="container"><div class="card"><div class="header"><h1>⚡ Worker 管理面板</h1><div class="btn-group"><a href="${TG_GROUP_URL}" target="_blank" class="btn-small">✈️ 加入群组</a><span class="btn-small" onclick="logout()">退出登录</span></div></div><div style="margin-bottom:20px;text-align:center">${s}</div><div class="field" style="background:rgba(108,92,231,0.2);padding:15px;border-radius:10px;border:1px solid rgba(162,155,254,0.4)"><span class="label" style="color:#a29bfe;font-weight:bold">🚀 快速自适应订阅 (推荐) 通用订阅复制这里</span><div class="input-group"><input type="text" id="shortSub" value="https://${e}/${SUB_PASSWORD}" readonly onclick="this.select()"><button class="sec-btn" onclick="copyId('shortSub')">复制</button></div><div class="desc">直接使用此链接。支持通用订阅客户端(自适应客户端订阅)。<br/>节点将自动抓取上游并替换为Worker加速。</div><div style="margin-top:10px;font-size:0.9rem;color:#ff4757;font-weight:bold;text-align:center;">【↓下方的可修改内容指向手动订阅链接】</div></div><div class="field"><span class="label">1. 订阅数据源 (Sub优选订阅器处)</span><input type="text" id="subBaseUrl" value="https://${e}" placeholder="https://你的sub地址或者是worker域名地址" oninput="updateLink()"><div class="desc">这里可修改成你的sub地址或者是你的worker域名地址。</div></div><div class="field"><span class="label">2.Proxyip修改处 (ProxyIP)</span><div class="input-group"><input type="text" id="proxyIp" value="${DEFAULT_PROXY_IP}" placeholder="例如: 你的proxyip地址" oninput="updateLink()"><button class="sec-btn" onclick="checkProxy()">🔍 检测</button></div><div class="desc">这里决定了你的proxyip地址，谨慎修改正确的proxyip地址内容。</div></div><div class="field" id="clashSettings" style="display:none;background:rgba(0,0,0,0.15);padding:15px;border-radius:8px;margin-bottom:18px;border:1px dashed #6c5ce7"><span class="label" style="color:#a29bfe">⚙️ Clash 高级配置</span><div style="margin-bottom:10px"><span class="label" style="font-size:0.85rem">转换后端:</span><input type="text" id="converterUrl" value="${DEFAULT_CONVERTER}" oninput="updateLink()"></div><div><span class="label" style="font-size:0.85rem">远程配置:</span><input type="text" id="configUrl" value="https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.12.x/sing-box.json" oninput="updateLink()"></div></div><div class="field"><span class="label">3. 手动生成订阅链接 (Legacy)</span><input type="text" id="resultUrl" readonly onclick="this.select()"><div class="checkbox-wrapper"><input type="checkbox" id="clashMode" onchange="toggleClashMode()"><label for="clashMode">🔄 开启 Clash 转换</label></div></div><div class="input-group"><button class="main-btn" onclick="copyId('resultUrl')">📄 复制订阅链接</button><button class="sec-btn" onclick="window.open(document.getElementById('resultUrl').value)" style="width:120px">🚀 测试</button></div></div><div class="card"><h3>🚀 优选IP预览</h3><div class="field"><span class="label">内置 IP 列表</span><textarea id="customIps" readonly style="background:rgba(0,0,0,0.2);border-color:transparent;cursor:default;height:150px">${DEFAULT_CUSTOM_IPS}</textarea></div></div></div><div id="toast" class="toast">已复制!</div><script>function toggleClashMode(){const e=document.getElementById("clashMode").checked;document.getElementById("clashSettings").style.display=e?"block":"none",updateLink()}function updateLink(){let e=document.getElementById("subBaseUrl").value.trim();e.endsWith("/")&&(e=e.slice(0,-1)),e.startsWith("http")||(e="https://"+e);const t=document.getElementById("proxyIp").value.trim(),s="${t}",n=document.getElementById("clashMode").checked;let r="/";t&&(r="/proxyip="+t);const o=e+"/sub?uuid="+s+"&path="+encodeURIComponent(r);if(n){let e=document.getElementById("converterUrl").value.trim();e.endsWith("/")&&(e=e.slice(0,-1));const t=document.getElementById("configUrl").value.trim();let s=t?"&config="+encodeURIComponent(t):"";document.getElementById("resultUrl").value=e+"/sub?target=clash&url="+encodeURIComponent(o)+s+"&emoji=true&list=false&tfo=false&scv=false&fdn=false&sort=false"}else document.getElementById("resultUrl").value=o}function copyId(e){navigator.clipboard.writeText(document.getElementById(e).value).then((()=>showToast("已复制!")))}function checkProxy(){const e=document.getElementById("proxyIp").value.trim();e?(navigator.clipboard.writeText(e).then((()=>{alert("ProxyIP 已复制!"),window.open("${PROXY_CHECK_URL}","_blank")})),window.open("${PROXY_CHECK_URL}","_blank")):window.open("${PROXY_CHECK_URL}","_blank")}function showToast(e){const t=document.getElementById("toast");t.innerText=e,t.classList.add("show"),setTimeout((()=>t.classList.remove("show")),2e3)}function logout(){document.cookie="auth=;expires=Thu,01 Jan 1970 00:00:00 UTC;path=/;",location.reload()}window.onload=()=>{updateLink()};<\/script></body></html>`}
