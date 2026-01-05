@@ -98,39 +98,209 @@
 
 ### 🧱 基础核心配置
 
-| 变量名 | 必填 | 说明 | 示例 |
-| :--- | :---: | :--- | :--- |
-| **`UUID`** | ✅ | **主 UUID** (用户ID)，客户端连接凭证 | `06b65903-406d-4a41-8463-6fd5c0ee7798` |
-| **`KEY`** | 可选 | **动态 UUID 密钥** (启用后自动生成时效性 UUID)<br>*与 `UUID_REFRESH` 配合使用，增强安全性* | `my-secret-key-2024` |
-| **`UUID_REFRESH`** | 可选 | **UUID 刷新周期** (秒)，默认 86400 (24小时)<br>*需配合 `KEY` 使用，定期自动更换 UUID* | `86400` |
-| **`WEB_PASSWORD`** | ✅ | **后台登录密码** (务必设置复杂密码) | `admin888` |
-| **`SUB_PASSWORD`** | ✅ | **订阅路径密码** (访问 `https://域名/密码`) | `my-secret-sub` |
-| **`PROXYIP`** | ✅ | **默认优选域名/IP** (节点连接地址) | `cf.090227.xyz` |
-| **`SUB_DOMAIN`** | ✅ | **真实订阅源** (上游优选订阅生成器地址)<br>*自动清洗 `https://` 和尾部 `/`* | `sub.cmliussss.net` |
-| **`SUBAPI`** | 可选 | **订阅转换后端** (用于 Sing-box/Clash 转换)<br>*自动补全 `https://`* | `https://subapi.cmliussss.net` |
-| **`PS`** | 可选 | **节点备注** (自动追加到节点名称后)<br>*支持本地节点与上游订阅双重生效* | `【专线】` |
-| **`LOGIN_PAGE_TITLE`** | 可选 | **登录页面标题** (浏览器标签页显示的标题) | `Worker Login` |
-| **`DASHBOARD_TITLE`** | 可选 | **后台管理页面标题** (浏览器标签页显示的标题) | `烈火控制台 · Glass LH` |
+| 变量名 | 必填 | 说明 | 示例 | 支持多值 |
+| :--- | :---: | :--- | :--- | :---: |
+| **`UUID`** | ✅ | **主 UUID** (用户ID)，客户端连接凭证 | `06b65903-406d-4a41-8463-6fd5c0ee7798` | ❌ |
+| **`KEY`** | 可选 | **动态 UUID 密钥** (启用后自动生成时效性 UUID)<br>*与 `UUID_REFRESH` 配合使用，增强安全性* | `my-secret-key-2024` | ❌ |
+| **`UUID_REFRESH`** | 可选 | **UUID 刷新周期** (秒)，默认 86400 (24小时)<br>*需配合 `KEY` 使用，定期自动更换 UUID* | `86400` | ❌ |
+| **`WEB_PASSWORD`** | ✅ | **后台登录密码** (务必设置复杂密码) | `admin888` | ❌ |
+| **`SUB_PASSWORD`** | ✅ | **订阅路径密码** (访问 `https://域名/密码`) | `my-secret-sub` | ❌ |
+| **`PROXYIP`** | ✅ | **默认优选域名/IP** (节点连接地址)<br>**✅ 支持多个，使用英文逗号分隔，系统自动轮询** | `cf.090227.xyz` 或<br>`ip1.com,ip2.com,ip3.net` | ✅ |
+| **`SUB_DOMAIN`** | ✅ | **真实订阅源** (上游优选订阅生成器地址)<br>*自动清洗 `https://` 和尾部 `/`*<br>**✅ 支持多个，使用英文逗号分隔，自动故障切换** | `sub.cmliussss.net` 或<br>`sub1.com,sub2.com` | ✅ |
+| **`SUBAPI`** | 可选 | **订阅转换后端** (用于 Sing-box/Clash 转换)<br>*自动补全 `https://`*<br>**✅ 支持多个，使用英文逗号分隔，自动故障切换** | `https://subapi.cmliussss.net` 或<br>`api1.com,api2.com` | ✅ |
+| **`PS`** | 可选 | **节点备注** (自动追加到节点名称后)<br>*支持本地节点与上游订阅双重生效* | `【专线】` | ❌ |
+| **`LOGIN_PAGE_TITLE`** | 可选 | **登录页面标题** (浏览器标签页显示的标题) | `Worker Login` | ❌ |
+| **`DASHBOARD_TITLE`** | 可选 | **后台管理页面标题** (浏览器标签页显示的标题) | `烈火控制台 · Glass LH` | ❌ |
+| **`DLS`** | 可选 | **ADDCSV 速度下限筛选阈值** (单位 KB/s)<br>*低于此速度的节点会被过滤，默认 5000* | `5000` | ❌ |
 
 ### 🛡️ 安全与通知配置
 
-| 变量名 | 说明 | 示例 |
-| :--- | :--- | :--- |
-| `TG_BOT_TOKEN` | **Telegram 机器人 Token** (后台也可配置) | `123456:ABC-DEF...` |
-| `TG_CHAT_ID` | **Telegram 用户 ID** (后台也可配置) | `123456789` |
-| `CF_ID` | Cloudflare Account ID (用于统计) | `e06...` |
-| `CF_TOKEN` | Cloudflare API Token (用于统计) | `Go...` |
-| `CF_EMAIL` | Cloudflare Email (Global Key 模式) | `user@example.com` |
-| `CF_KEY` | Cloudflare Global API Key | `868...` |
-| `WL_IP` | **静态白名单 IP** (免检，视为管理员) | `210.61.97.241` |
+| 变量名 | 说明 | 示例 | 支持多值 |
+| :--- | :--- | :--- | :---: |
+| `TG_BOT_TOKEN` | **Telegram 机器人 Token** (后台也可配置) | `123456:ABC-DEF...` | ❌ |
+| `TG_CHAT_ID` | **Telegram 用户 ID** (后台也可配置) | `123456789` | ❌ |
+| `CF_ID` | Cloudflare Account ID (用于统计) | `e06...` | ❌ |
+| `CF_TOKEN` | Cloudflare API Token (用于统计) | `Go...` | ❌ |
+| `CF_EMAIL` | Cloudflare Email (Global Key 模式) | `user@example.com` | ❌ |
+| `CF_KEY` | Cloudflare Global API Key | `868...` | ❌ |
+| `WL_IP` | **静态白名单 IP** (免检，视为管理员)<br>**✅ 支持多个，使用英文逗号分隔** | `1.2.3.4` 或<br>`1.1.1.1,2.2.2.2` | ✅ |
 
 ### 🌍 节点来源配置
 
-| 变量名 | 说明 | 格式说明 |
+| 变量名 | 说明 | 格式说明 | 支持多值 |
+| :--- | :--- | :--- | :---: |
+| `ADD` | **本地优选 IP 列表** | 每行一个 IP，格式：`IP:端口#节点名称`<br>示例：`1.1.1.1:443#美国节点` | ✅ (换行分隔) |
+| `ADDAPI` | **远程 TXT 优选列表** | 填入 URL，内容格式同 ADD (一行一个 IP)<br>**✅ 支持多个 URL，换行分隔** | ✅ (换行分隔) |
+| `ADDCSV` | **远程 CSV 优选列表** | 填入 URL，支持高级节点信息导入<br>**✅ 支持多个 URL，换行分隔**<br>*配合 `DLS` 变量可过滤低速节点* | ✅ (换行分隔) |
+
+### 🎨 界面链接配置 (可选)
+
+| 变量名 | 说明 | 默认值 | 支持多值 |
+| :--- | :--- | :--- | :---: |
+| `TG_GROUP_URL` | **登录页交流群链接** | `https://t.me/zyssadmin` | ❌ |
+| `SITE_URL` | **登录页网站链接** | `https://123.com/` | ❌ |
+| `GITHUB_URL` | **登录页项目链接** | `https://github.com/xtgm/stallTCP1.3V1` | ❌ |
+| `PROXY_CHECK_URL` | **后台 ProxyIP 检测跳转地址** | `https://kaic.hidns.co/` | ❌ |
+
+### 📋 订阅转换配置 (可选)
+
+| 变量名 | 说明 | 默认值 | 支持多值 |
+| :--- | :--- | :--- | :---: |
+| `CLASH_CONFIG` | **Clash 配置模板 URL** | ACL4SSR_Online_Full_MultiMode.ini | ❌ |
+| `SINGBOX_CONFIG_V12` | **Sing-box v1.12.x 配置模板 URL** | sinspired/sub-store-template/1.12.x | ❌ |
+
+### 🔗 绑定变量 (D1/KV)
+
+| 变量名 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `ADD` | **本地优选 IP 列表** | `1.1.1.1:443#美国, 2.2.2.2#香港` |
-| `ADDAPI` | **远程 TXT 优选列表** | 填入 URL，格式同上 (一行一个 IP) |
-| `ADDCSV` | **远程 CSV 优选列表** | 填入 URL，支持高级节点信息导入 |
+| `DB` | D1 数据库 | **D1 数据库绑定** (变量名必须为 `DB`，不可更改) |
+| `LH` | KV 命名空间 | **KV 存储绑定** (变量名必须为 `LH`，不可更改) |
+
+### 📝 多值配置详细使用说明
+
+**以下变量支持配置多个值，实现负载均衡或故障切换功能：**
+
+#### 1. `PROXYIP` - 多 ProxyIP 轮询负载均衡
+
+**功能：** 系统会基于时间戳自动在多个 ProxyIP 之间轮询切换，实现负载均衡。
+
+**格式：** 多个地址使用**英文逗号 `,`** 分隔
+
+**示例：**
+```
+ProxyIP.US.CMLiussss.net,cf.090227.xyz,proxyip.example.com
+```
+
+**工作原理：**
+- 系统使用 `Math.floor(Date.now() / 1000) % proxyIPs.length` 计算当前使用哪个 IP
+- 每秒自动切换到下一个 IP（取模轮询）
+- 所有 ProxyIP 地址会被自动 trim 去除空格
+
+---
+
+#### 2. `SUB_DOMAIN` - 多订阅源故障切换
+
+**功能：** 当第一个订阅源不可用时，自动尝试下一个，实现高可用性。
+
+**格式：** 多个域名使用**英文逗号 `,`** 分隔
+
+**示例：**
+```
+sub.cmliussss.net,backup.example.com,sub3.proxy.net
+```
+
+**工作原理：**
+- 系统按顺序尝试每个订阅源
+- 自动清洗 `https://` 前缀和尾部 `/`
+- 跳过与当前 Worker 域名相同的地址（防止死循环）
+- 第一个成功响应的订阅源将被使用
+
+---
+
+#### 3. `SUBAPI` - 多订阅转换器故障切换
+
+**功能：** 当第一个转换器不可用时，自动尝试下一个。
+
+**格式：** 多个 URL 使用**英文逗号 `,`** 分隔
+
+**示例：**
+```
+https://subapi.cmliussss.net,https://api.v1.mk,https://sub.xeton.dev
+```
+
+**工作原理：**
+- 系统按顺序尝试每个转换 API
+- 自动补全 `https://` 前缀
+- 自动去除尾部 `/`
+- 第一个成功响应的转换器将被使用
+
+---
+
+#### 4. `WL_IP` - 多白名单 IP 支持ipv4跟ipv6
+
+**功能：** 设置多个管理员 IP，这些 IP 无需登录即可访问后台。
+
+**格式：** 多个 IP 使用**英文逗号 `,`** 分隔
+
+**示例：**
+```
+1.2.3.4,5.6.7.8,2001:db8::1
+```
+
+**说明：**
+- 支持 IPv4 和 IPv6 地址
+- 系统预设 IP 无法在后台删除
+- 手动添加的 IP 可以在后台删除
+
+---
+#### 5. `ADD` / `ADDAPI` / `ADDCSV` - 多节点源
+
+**功能：** 支持多行配置或多个远程 URL，所有节点会合并生成。
+
+**ADD 格式：** 每行一个 IP，使用**换行符**分隔
+```
+1.1.1.1:443#美国CF
+8.8.8.8:443#谷歌DNS
+2606:4700:4700::1111:443#IPv6节点
+```
+
+**ADDAPI 格式：** 每行一个 URL，使用**换行符**分隔
+```
+https://example.com/ips.txt
+https://backup.com/nodes.txt
+```
+
+**ADDCSV 格式：** 每行一个 URL，使用**换行符**分隔
+```
+https://example.com/优选IP.csv
+https://backup.com/speed-test.csv
+```
+
+**ADDCSV 高级功能 - DLS 速度筛选：**
+- CSV 文件格式：`IP,端口,TLS,数据中心,地区,城市,网络延迟,下载速度`
+- 配合 `DLS` 环境变量设置速度下限（单位 KB/s）
+- 下载速度低于 `DLS` 值的节点会被自动过滤
+- 默认阈值为 5000 KB/s
+
+---
+
+### 🔄 环境变量配置完整示例
+
+**Cloudflare Workers 环境变量设置示例：**
+
+```plaintext
+# 基础配置
+UUID = 06b65903-406d-4a41-8463-6fd5c0ee7798
+WEB_PASSWORD = MySecurePassword123
+SUB_PASSWORD = my-sub-path
+
+# 多 ProxyIP 轮询（逗号分隔）
+PROXYIP = ProxyIP.US.CMLiussss.net,cf.090227.xyz,cdn.example.com
+
+# 多订阅源故障切换（逗号分隔）
+SUB_DOMAIN = sub.cmliussss.net,backup.sub.com
+
+# 多转换器故障切换（逗号分隔）
+SUBAPI = https://subapi.cmliussss.net,https://api.v1.mk
+
+# 多白名单 IP（逗号分隔）
+WL_IP = 192.168.1.1,10.0.0.1
+
+# TG 通知
+TG_BOT_TOKEN = 123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+TG_CHAT_ID = 987654321
+
+# CF 统计
+CF_ID = your-account-id
+CF_TOKEN = your-api-token
+
+# 节点备注
+PS = 【专线】
+
+# ADDCSV 速度筛选阈值
+DLS = 3000
+```
+
 
 ---
 
